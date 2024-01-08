@@ -4,10 +4,12 @@ import {
   PluginSettingTab,
   Setting,
   Editor,
-  sanitizeHTMLToDom
 } from 'obsidian';
-
-import {initialize, evaluate} from './evaluator.ts'
+import { ElementsManager } from './elements.js';
+import { ClojureEvaluator, DocumentEvaluation } from './evaluator.js'
+import { VaultWrapper } from './vault.js';
+import { WorkspaceWrapper } from './workspace.js';
+import { Logger } from './logger.js';
 
 interface ObsidianClojureSettings {
   fullErrors: boolean
@@ -28,72 +30,29 @@ ${toBeWrapped}
 }
 
 export default class ObsidianClojure extends Plugin {
-  settings: ObsidianClojureSettings;
+  public settings: ObsidianClojureSettings;
 
   eventsToListenTo: string[];
 
   // TODO need to get rid of this hack
   defaultTimeout: number;
 
-  async evalAll(sciCtx) {
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      if (leaf.getViewState().type === "markdown" && leaf.getViewState().state.mode === "preview") {
-        const containerEl = leaf.containerEl;
-        evaluate(sciCtx,
-                 containerEl,
-                 this.settings,
-                 {sanitizer: sanitizeHTMLToDom});
-      }
-    });
-  }
+  public log = new Logger()
 
-  killCustomIntervals () {
-    for (const intervalID of this.activeIntervals) {
-      clearInterval(intervalID)
-    }
-  }
+  public elements: ElementsManager
 
-  killIntervalsAndEval() {
-    this.killCustomIntervals();
-    this.evalAll(this.sciCtx)
-  }
+  public evaluator: ClojureEvaluator
 
-  handleRenderFromEvent() {
-    window.setTimeout(() => {
-      this.killIntervalsAndEval();
-    }, this.defaultWaitTimeout)
-  }
-
-  customSetInterval(func, interval_ms) {
-    const intervalID = window.setInterval(func, interval_ms)
-    this.registerInterval(intervalID)
-    this.activeIntervals.push(intervalID)
-  }
+  public vaultWrapper: VaultWrapper
+  public workspaceWrapper: WorkspaceWrapper
 
   async onload() {
     await this.loadSettings();
 
-    this.eventsToListenTo = [
-      'editor-change',
-      'file-open',
-      'layout-change',
-      'active-leaf-change',
-    ];
-    this.defaultWaitTimeout = 100;
-    this.activeIntervals = [];
-
-    window.setIntervalTracked = this.customSetInterval.bind(this);
-
-    this.sciCtx = initialize(window)
-
-    this.eventsToListenTo.forEach((eventName) => {
-      const eventRef = this.app.workspace.on(eventName, this.handleRenderFromEvent.bind(this))
-      this.registerEvent(eventRef);
-    })
-
-    // TODO Figure out how to wait for document to finalize initalization
-    // Initial load of plugin should be considered an "event" in itself
-    this.handleRenderFromEvent()
+    this.vaultWrapper = new VaultWrapper(this)
+    this.workspaceWrapper = new WorkspaceWrapper(this)
+    this.elements = new ElementsManager(this)
+    this.evaluator = new ClojureEvaluator(this)
 
     this.addCommand({
       id: 'insert-clojure-code-block',
@@ -114,14 +73,39 @@ export default class ObsidianClojure extends Plugin {
       }
     });
 
-
     this.addSettingTab(new ObsidianClojureSettingTab(this.app, this));
+
+    this.evaluator.setDocumentEvaluatedListener((documentEvaluation) => {
+      this.workspaceWrapper.rerender(documentEvaluation.path)
+    })
+
+    this.registerMarkdownPostProcessor((el, context) => {
+      // `el` here is usually a section of a file. ``` blocks appear to always be one section. Inline code, however, can 
+      // be surrounded by text, which may be on multiple lines.
+
+      if (!this.elements.hasCodeDescendants(el)) {
+        return
+      }
+
+      // TODO Look into context.addChild and whether we could get a callback when the file is closed, for example
+      //   It might be a good spot to kill intervals
+
+      this.evaluator.evaluate(context.sourcePath, (documentEvaluation, cached) => {
+        if (cached) {
+          documentEvaluation.attach(el, context.getSectionInfo(el))
+        } else {
+          // If the document evaluation wasn't cached then we expect a call to our DocumentEvaluatedListener which will
+          // trigger a rerender. Each section of the document will then be processed by this Markdown post-processor
+          // once more, and the documentation evaluation will be cached.
+        }
+      })
+    });
   }
 
   async onunload() {
-    // Clean up our intervals + the function we expose
-    this.killCustomIntervals();
-    window.setIntervalTracked = undefined;
+    this.elements = null
+    this.evaluator.clear()
+    this.evaluator = null
   }
 
   async loadSettings() {
@@ -130,6 +114,7 @@ export default class ObsidianClojure extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+    this.evaluator.clear()
   }
 }
 
@@ -153,7 +138,7 @@ class ObsidianClojureSettingTab extends PluginSettingTab {
       .setDesc('What language should the code-block be set to for us to evaluate it?')
       .addText((text) => {
         text.setPlaceholder('clojure')
-          .setValue(this.plugin.settings.blockLanguage)
+          .setValue(this.plugin.settings.blockLanguage.toString())
           .onChange(async (value) => {
             this.plugin.settings.blockLanguage = value
             await this.plugin.saveSettings()
