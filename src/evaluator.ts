@@ -1,20 +1,21 @@
-import { MarkdownSectionInformation, MarkdownView, TFile, getLinkpath, parseFrontMatterStringArray, parseYaml, sanitizeHTMLToDom } from 'obsidian';
+import { MarkdownRenderer, MarkdownSectionInformation, MarkdownView, TFile, parseYaml, sanitizeHTMLToDom } from 'obsidian';
 import sci from '../lib/sci.js'
 import { IntervalsManager } from './intervals.js';
 import ObsidianClojure from './main.js';
 import CryptoJS from 'crypto-js';
+import toposort from 'toposort'
+import { Literal, getAPI } from "obsidian-dataview";
 
 interface EvalCallbacks {
+  current: Record<string, Literal>,
   onRenderText: (info: any) => void
+  onRenderMarkdown: (info: any) => void
   onRenderHTML: (info: any) => void
   onRenderUnsafeHTML: (info: any) => void
   onRenderCode: (info: any) => void
   onRenderReagent: (reagentComponent: any) => void
   onSetInterval: (handler: TimerHandler, intervalMs: number) => void
-}
-
-function initialize(global_object: any) {
-  return sci.init(global_object)
+  onChart: (data: any) => void
 }
 
 // Receives a string with HTML, and returns a sanitized HTMLElement
@@ -136,12 +137,12 @@ export class ClojureEvaluator {
     return promise
   }
 
-  public evaluateSource(source: string, callbacks: EvalCallbacks, current: Record<string, Literal>) {
+  public evaluateSource(source: string, callbacks: EvalCallbacks) {
     let output: string = ''
     let isError: boolean = false
 
     try {
-      output = sci.eval(this.sciContext, source, callbacks, current)
+      output = sci.eval(this.sciContext, source, callbacks)
     } catch (err) {
       console.error(err)
       console.trace()
@@ -342,6 +343,7 @@ export class CodeBlockEvaluation {
     const sanitizer = opts?.sanitizer || defaultSanitize
 
     const callbacks: EvalCallbacks = {
+      current: getAPI().page(path),
       onRenderText: (info: any) => {
         this.setRenderFunction((r) => r.innerText = info)
       },
@@ -359,7 +361,10 @@ export class CodeBlockEvaluation {
         this.setRenderFunction((r) => r.innerHTML = info)
       },
       onRenderCode: (info: any) => {
-        this.setRenderFunction((r) => r.innerText = "=> " + sci.ppStr(info))
+        this.setRenderFunction((r) => {
+          // TODO Use the view component instead of the plugin?
+          MarkdownRenderer.renderMarkdown("```\n" + info + "\n```", r, path, this.plugin)
+        })
       },
       onRenderReagent: (reagentComponent: any) => {
         this.setRenderFunction((r) => {
@@ -382,7 +387,7 @@ export class CodeBlockEvaluation {
       }
     }
 
-    const result = this.plugin.evaluator.evaluateSource(this.codeBlock.source, callbacks, getAPI().page(path))
+    const result = this.plugin.evaluator.evaluateSource(this.codeBlock.source, callbacks)
 
     this.output = result.output
     this.isError = result.isError

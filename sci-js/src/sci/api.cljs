@@ -1,4 +1,5 @@
 (ns sci.api
+  (:require-macros [wield.macros :refer [def-api bind-api]])
   (:require
     [clojure.pprint :refer [pprint]]
     [sci.core :as sci]
@@ -29,12 +30,12 @@
                                 'parse ld/parse
                                 'plus-days ld/plus-days
                                 'minus-days ld/minus-days}
-                          'o (update-keys (js->clj o-bindings) symbol)
-                          'p {'all promesa.core/all
-                              'resolved promesa.core/resolved
-                              'rejected promesa.core/rejected
-                              'then (fn [p f] (promesa.core/then p (sci.impl.vars/binding-conveyor-fn f)))}
-                          'vars {'binding-conveyor-fn sci.impl.vars/binding-conveyor-fn}}}))
+                           'o (update-keys (js->clj o-bindings) symbol)
+                           'p {'all promesa.core/all
+                               'chain promesa.core/chain
+                               'resolved promesa.core/resolved
+                               'rejected promesa.core/rejected
+                               'then (fn [p f] (promesa.core/then p (sci.impl.vars/binding-conveyor-fn f)))}}}))
 
 (defn ^:export renderReagent [app container]
   (rdom/render app container))
@@ -44,43 +45,31 @@
     (with-out-str (pprint t))
     (catch js/Error e t)))
 
-(def *renderCode (sci/new-dynamic-var '*renderCode nil))
-(def *renderText (sci/new-dynamic-var '*renderText nil))
-(def *renderMarkdown (sci/new-dynamic-var '*renderMarkdown nil))
-(def *renderHTML (sci/new-dynamic-var '*renderHTML nil))
-(def *renderReagent (sci/new-dynamic-var '*renderReagent nil))
-(def setInterval (sci/new-dynamic-var 'setInterval nil))
-(def chart (sci/new-dynamic-var 'chart nil))
-(def sci-current (sci/new-dynamic-var 'current nil))
+(def-api {code #(.-onRenderCode ^js/Object %)
+          text #(.-onRenderText ^js/Object %)
+          md #(.-onRenderMarkdown ^js/Object %)
+          html #(.-onRenderHTML ^js/Object %)
+          reagent (fn [callbacks] (fn [app container-el] (.onRenderReagent ^js/Object callbacks app)))
+          set-interval #(.-onSetInterval ^js/Object %)
+          chart (fn [callbacks] #(.onChart ^js/Object callbacks (clj->js %)))
+          current #(.-current ^js/Object %)})
 
 (defn ^:export evalString 
   [ctx 
    source 
-   {:keys [onRenderHTML onRenderText onRenderCode onRenderReagent onSetInterval onChart] :as opts}
-   current-page]
-  (sci/binding [*renderCode (.-onRenderCode ^js/Object opts)
-                *renderText (.-onRenderText ^js/Object opts)
-                *renderMarkdown (.-onRenderMarkdown ^js/Object opts)
-                *renderHTML (.-onRenderHTML ^js/Object opts)
-                *renderReagent (fn [app container-el] (.onRenderReagent opts app))
-                setInterval (.-onSetInterval ^js/Object opts)
-                chart #(.onChart ^js/Object opts (clj->js %))
-                sci-current (fn [] current-page)]
-    (sci/eval-string*
-      (assoc
-        ctx
-        :bindings
-        (assoc (:bindings ctx)
-               '*renderHTML *renderHTML
-               '*renderText *renderText
-               '*renderMarkdown *renderMarkdown
-               '*renderCode *renderCode
-               '*renderReagent *renderReagent
-               'setInterval setInterval
-               'chart chart
-               'current sci-current
-               ))
-      source)))
+   {:keys [onRenderHTML onRenderText onRenderCode onRenderReagent onSetInterval onChart] :as opts}]
+  (bind-api opts
+            (sci/eval-string*
+              (sci/merge-opts ctx
+                              {:namespaces {'w {'html w-html
+                                                'text w-text
+                                                'md w-md
+                                                'code w-code
+                                                'reagent w-reagent
+                                                'set-interval w-set-interval
+                                                'chart w-chart
+                                                'current w-current}}})
+              source)))
 
 (comment
   (def ctx (init nil))
