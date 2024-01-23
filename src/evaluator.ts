@@ -212,21 +212,25 @@ export class ClojureEvaluator {
 
     if (evaluate) {
       console.log(`${path}: Queueing evaluation.`)
-      this.documentEvaluations[path] = this.evaluateFile(path, hash, markdown)
+      this.documentEvaluations[path] = this.evaluateFile(file, hash, markdown)
     }
 
     return [await this.documentEvaluations[path], !evaluate]
   }
 
-  private async evaluateFile(path: string, hash: string, markdown: string) {
+  private async evaluateFile(file: TFile, hash: string, markdown: string) {
+    const path = file.path
     const label = `${path}: Evaluated in`
     console.time(label)
+
+    const metadata = this.plugin.app.metadataCache.getFileCache(file)
+    const ns = metadata?.frontmatter?.['ns']
 
     const lang = this.plugin.settings.blockLanguage.toString()
     const codeBlocks = extractCodeBlocks(lang, markdown)
     const evaluations: CodeBlockEvaluation[] = []
     for (const codeBlock of codeBlocks) {
-      const evaluation = new CodeBlockEvaluation(this.plugin, codeBlock, this.opts, path)
+      const evaluation = new CodeBlockEvaluation(this.plugin, codeBlock, path, ns)
       evaluations.push(evaluation)
     }
 
@@ -315,10 +319,10 @@ export class CodeBlockEvaluation {
   private plugin: ObsidianClojure
   private _intervalsManager?: IntervalsManager
 
-  constructor(plugin: ObsidianClojure, codeBlock: CodeBlock, opts: any, path: string) {
+  constructor(plugin: ObsidianClojure, codeBlock: CodeBlock, path: string, ns?: string) {
     this.plugin = plugin
     this.codeBlock = codeBlock
-    this.eval(opts, path)
+    this.eval(path, ns)
   }
 
   public attach(el: HTMLElement) {
@@ -339,9 +343,7 @@ export class CodeBlockEvaluation {
     return this._intervalsManager
   }
 
-  private eval(opts: any, path: string) {
-    const sanitizer = opts?.sanitizer || defaultSanitize
-
+  private eval(path: string, ns?: string) {
     const callbacks: EvalCallbacks = {
       current: getAPI().page(path),
       onRenderText: (info: any) => {
@@ -354,7 +356,7 @@ export class CodeBlockEvaluation {
         })
       },
       onRenderHTML: (info: any) => {
-        this.setRenderFunction((r) => r.appendChild(sanitizer(info)))
+        this.setRenderFunction((r) => r.appendChild(sanitizeHTMLToDom(info)))
       },
       // TODO not implemented on the SCI side yet, not sure we need or not
       onRenderUnsafeHTML: (info: any) => {
@@ -387,7 +389,8 @@ export class CodeBlockEvaluation {
       }
     }
 
-    const result = this.plugin.evaluator.evaluateSource(this.codeBlock.source, callbacks)
+    const source = ns ? `(ns ${ns})\n${this.codeBlock.source}` : this.codeBlock.source
+    const result = this.plugin.evaluator.evaluateSource(source, callbacks)
 
     this.output = result.output
     this.isError = result.isError

@@ -6,7 +6,7 @@ import {
   Editor,
 } from 'obsidian';
 import { ElementsManager } from './elements.js';
-import { ClojureEvaluator, DocumentEvaluation } from './evaluator.js'
+import { ClojureEvaluator } from './evaluator.js'
 import { VaultWrapper } from './vault.js';
 import { WorkspaceWrapper } from './workspace.js';
 
