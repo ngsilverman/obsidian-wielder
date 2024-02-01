@@ -53,7 +53,7 @@ function extractCodeBlocks(lang: string, markdown: string): CodeBlock[] {
       currentBlock += line + '\n';
     } else {
       // Handling inline code
-      const inlineRegex = /`\|([^`]+)`/g
+      const inlineRegex = /`(\([^`]+\))`/g
       let inlineMatch
       while ((inlineMatch = inlineRegex.exec(line)) !== null) {
         codeBlocks.push({
