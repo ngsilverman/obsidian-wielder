@@ -53,10 +53,13 @@ export class ElementsManager {
     const codeElement = codeElements[evaluation.sectionIndex]
 
     codeElement.setAttribute(INLINE_CODE_ELEMENT_SOURCE_ATTRIBUTE_NAME, evaluation.codeBlock.source)
-    codeElement.innerText = evaluation.output
-    codeElement.style.color = 'inherit'
-    codeElement.style.backgroundColor = 'inherit'
-    codeElement.style.fontSize = 'inherit'
+
+    const { output } = evaluation;
+    if (output.sym !== undefined && typeof output.root !== 'function') {
+      codeElement.innerText = `${output.sym.name} = ${output.root}`;
+    } else {
+      codeElement.innerText = output;
+    }
   }
 
   public hasCodeDescendants(container: HTMLElement): boolean {
