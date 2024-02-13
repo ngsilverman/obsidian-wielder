@@ -5,6 +5,21 @@ import ObsidianClojure from "./main"
 const RESULTS_WRAPPER_CLASS = 'eval-results'
 const INLINE_CODE_ELEMENT_SOURCE_ATTRIBUTE_NAME = 'data-clojure-source'
 
+function formatDollar(amount: number) {
+  return amount % 1 === 0 ? `$${amount.toLocaleString()}` : `$${amount.toFixed(2).toLocaleString()}`;
+}
+
+function formatPercentage(value: number) {
+  const percentage = value * 100;
+  if (percentage % 1 === 0) {
+      return `${percentage}%`;
+  } else if (Math.round(percentage * 10) % 10 === 0) {
+      return `${percentage.toFixed(1)}%`;
+  } else {
+      return `${percentage.toFixed(2)}%`;
+  }
+}
+
 export class ElementsManager {
 
   private plugin: ObsidianClojure
@@ -56,7 +71,16 @@ export class ElementsManager {
 
     const { output } = evaluation;
     if (output.sym !== undefined && typeof output.root !== 'function') {
-      codeElement.innerText = `${output.sym.name} = ${output.root}`;
+      const symName: string = output.sym.name;
+      let value: string;
+      if (symName.startsWith('$')) {
+        value = formatDollar(output.root);
+      } else if (symName.endsWith('%')) {
+        value = formatPercentage(output.root);
+      } else {
+        value = output.root;
+      }
+      codeElement.innerText = `${output.sym.name} = ${value}`;
     } else {
       codeElement.innerText = output;
     }

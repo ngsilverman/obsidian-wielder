@@ -310,7 +310,7 @@ interface CodeBlock {
 
 export class CodeBlockEvaluation {
   public codeBlock: CodeBlock
-  public output?: string
+  public output?: any
   public isError?: boolean
   public renderFunction?: (resultsCodeEl: HTMLElement) => void
   public sectionIndex: number = 0
