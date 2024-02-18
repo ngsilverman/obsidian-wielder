@@ -28,7 +28,10 @@ function sha256(message: string): string {
   return CryptoJS.SHA256(message).toString()
 }
 
-function extractCodeBlocks(lang: string, markdown: string): CodeBlock[] {
+/**
+ * @param inlineClojure if true then all inline code blocks are interpreted as clojure.
+ */
+function extractCodeBlocks(lang: string, markdown: string, inlineClojure: boolean): CodeBlock[] {
   const lines = markdown.split('\n');
   const codeBlocks: CodeBlock[] = []
   let isInCodeBlock = false
@@ -53,7 +56,7 @@ function extractCodeBlocks(lang: string, markdown: string): CodeBlock[] {
       currentBlock += line + '\n';
     } else {
       // Handling inline code
-      const inlineRegex = /`(\([^`]+\))`/g
+      const inlineRegex = inlineClojure ? /`([^`]+)`/g : /`(\([^`]+\))`/g
       let inlineMatch
       while ((inlineMatch = inlineRegex.exec(line)) !== null) {
         codeBlocks.push({
@@ -225,12 +228,13 @@ export class ClojureEvaluator {
 
     const metadata = this.plugin.app.metadataCache.getFileCache(file)
     const ns = metadata?.frontmatter?.['ns']
+    const clojureInline = metadata?.frontmatter?.['clojure-inline'] != null
 
     const lang = this.plugin.settings.blockLanguage.toString()
-    const codeBlocks = extractCodeBlocks(lang, markdown)
+    const codeBlocks = extractCodeBlocks(lang, markdown, clojureInline)
     const evaluations: CodeBlockEvaluation[] = []
     for (const codeBlock of codeBlocks) {
-      const evaluation = new CodeBlockEvaluation(this.plugin, codeBlock, path, ns)
+      const evaluation = new CodeBlockEvaluation(this.plugin, codeBlock, path, ns, clojureInline)
       evaluations.push(evaluation)
     }
 
@@ -314,14 +318,16 @@ export class CodeBlockEvaluation {
   public isError?: boolean
   public renderFunction?: (resultsCodeEl: HTMLElement) => void
   public sectionIndex: number = 0
+  public clojureInline: boolean
 
   private el?: HTMLElement
   private plugin: ObsidianClojure
   private _intervalsManager?: IntervalsManager
 
-  constructor(plugin: ObsidianClojure, codeBlock: CodeBlock, path: string, ns?: string) {
+  constructor(plugin: ObsidianClojure, codeBlock: CodeBlock, path: string, ns?: string, clojureInline?: boolean) {
     this.plugin = plugin
     this.codeBlock = codeBlock
+    this.clojureInline = clojureInline
     this.eval(path, ns)
   }
 

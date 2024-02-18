@@ -64,7 +64,7 @@ export class ElementsManager {
   }
 
   public renderInlineCode(sectionElement: HTMLElement, evaluation: CodeBlockEvaluation) {
-    const codeElements = this.getCodeElements(sectionElement)
+    const codeElements = this.getCodeElements(sectionElement, evaluation.clojureInline)
     const codeElement = codeElements[evaluation.sectionIndex]
 
     codeElement.setAttribute(INLINE_CODE_ELEMENT_SOURCE_ATTRIBUTE_NAME, evaluation.codeBlock.source)
@@ -86,34 +86,34 @@ export class ElementsManager {
     }
   }
 
-  public hasCodeDescendants(container: HTMLElement): boolean {
+  public hasCodeDescendants(container: HTMLElement, clojureInline: boolean): boolean {
     for (const codeElement of container.querySelectorAll('code')) {
-      if (this.isCode(codeElement)) return true
+      if (this.isCode(codeElement, clojureInline)) return true
     }
     return false
   }
 
-  private getCodeElements(containerEl: HTMLElement): HTMLElement[] {
+  private getCodeElements(containerEl: HTMLElement, clojureInline: boolean): HTMLElement[] {
     const codeElements = containerEl.querySelectorAll('code')
     const clojureCodeElements: HTMLElement[] = []
     codeElements.forEach((el) => {
-      if (this.isCode(el)) {
+      if (this.isCode(el, clojureInline)) {
         clojureCodeElements.push(el)
       }
     })
     return clojureCodeElements
   }
 
-  private isCode(codeElement: HTMLElement): boolean {
-    // Unrendered inline code--rendering replaces the inner text with the code output.
-    if (codeElement.innerText[0] === '(' && codeElement.innerText.slice(-1) === ')') return true
-
+  private isCode(codeElement: HTMLElement, clojureInline: boolean): boolean {
     // Rendered inline code--we recognize it with the help of a special attribute.
     if (codeElement.hasAttribute(INLINE_CODE_ELEMENT_SOURCE_ATTRIBUTE_NAME)) return true
 
     // Code blocks.
     const classList = codeElement.classList
     const languageClass = 'language-' + this.plugin.settings.blockLanguage
-    return classList.contains(languageClass)
+    if (classList.value.contains('language-')) return classList.contains(languageClass)
+
+    // Unrendered inline code--rendering replaces the inner text with the code output.
+    return clojureInline || codeElement.innerText[0] === '(' && codeElement.innerText.slice(-1) === ')'
   }
 }

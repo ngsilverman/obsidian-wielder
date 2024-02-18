@@ -98,7 +98,8 @@ export default class ObsidianClojure extends Plugin {
       // `el` here is usually a section of a file. ``` blocks appear to always be one section. Inline code, however, can 
       // be surrounded by text, which may be on multiple lines.
 
-      if (!this.elements.hasCodeDescendants(el)) {
+      const clojureInline = context.frontmatter?.['clojure-inline']
+      if (!this.elements.hasCodeDescendants(el, clojureInline)) {
         return
       }
 
