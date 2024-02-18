@@ -45,6 +45,35 @@
     (with-out-str (pprint t))
     (catch js/Error e t)))
 
+(defn $ [price & _]
+  (let [number-format #js {:style "currency" :currency "USD"}
+        formatted-price (.format (js/Intl.NumberFormat. "en-US" number-format) price)
+        regex #"\.00$|(\.\d)0$"]
+    (clojure.string/replace formatted-price regex "$1")))
+
+(def def$ ^:sci/macro
+  (fn [_&form _&env name value]
+    `(do (def ~name ~value)
+         (user/$ ~value))))
+
+(def def=$ ^:sci/macro
+  (fn [_&form _&env name value]
+    `(do (def ~name ~value)
+         (str '~name " = " (user/$ ~value)))))
+
+(defn % [float] 
+  (str (.toFixed (* float 100) 2) "%"))
+
+(def def% ^:sci/macro
+  (fn [_&form _&env name value]
+    `(do (def ~name ~value)
+         (user/% ~value))))
+
+(def def=% ^:sci/macro
+  (fn [_&form _&env name value]
+    `(do (def ~name ~value)
+         (str '~name " = " (user/% ~value)))))
+
 (def-api {code #(.-onRenderCode ^js/Object %)
           text #(.-onRenderText ^js/Object %)
           md #(.-onRenderMarkdown ^js/Object %)
@@ -61,7 +90,13 @@
   (bind-api opts
             (sci/eval-string*
               (sci/merge-opts ctx
-                              {:namespaces {'w {'html w-html
+                              {:namespaces {'user {'$ $
+                                                   '% %
+                                                   'def$ def$
+                                                   'def=$ def=$
+                                                   'def% def%
+                                                   'def=% def=%}
+                                            'w {'html w-html
                                                 'text w-text
                                                 'md w-md
                                                 'code w-code
