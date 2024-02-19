@@ -69,21 +69,7 @@ export class ElementsManager {
 
     codeElement.setAttribute(INLINE_CODE_ELEMENT_SOURCE_ATTRIBUTE_NAME, evaluation.codeBlock.source)
 
-    const { output } = evaluation;
-    if (output.sym !== undefined && typeof output.root !== 'function') {
-      const symName: string = output.sym.name;
-      let value: string;
-      if (symName.startsWith('$')) {
-        value = formatDollar(output.root);
-      } else if (symName.endsWith('%')) {
-        value = formatPercentage(output.root);
-      } else {
-        value = output.root;
-      }
-      codeElement.innerText = `${output.sym.name} = ${value}`;
-    } else {
-      codeElement.innerText = output;
-    }
+    codeElement.innerText = evaluation.output;
   }
 
   public hasCodeDescendants(container: HTMLElement, clojureInline: boolean): boolean {

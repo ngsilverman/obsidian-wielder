@@ -54,11 +54,13 @@
 (def def$ ^:sci/macro
   (fn [_&form _&env name value]
     `(do (def ~name ~value)
+         (alter-meta! #'~name #(assoc % :display-fn user/$))
          (user/$ ~value))))
 
 (def def=$ ^:sci/macro
   (fn [_&form _&env name value]
     `(do (def ~name ~value)
+         (alter-meta! #'~name #(assoc % :display-fn user/$))
          (str '~name " = " (user/$ ~value)))))
 
 (defn % [float] 
@@ -67,11 +69,13 @@
 (def def% ^:sci/macro
   (fn [_&form _&env name value]
     `(do (def ~name ~value)
+         (alter-meta! #'~name #(assoc % :display-fn user/%))
          (user/% ~value))))
 
 (def def=% ^:sci/macro
   (fn [_&form _&env name value]
     `(do (def ~name ~value)
+         (alter-meta! #'~name #(assoc % :display-fn user/%))
          (str '~name " = " (user/% ~value)))))
 
 (def-api {code #(.-onRenderCode ^js/Object %)
@@ -83,28 +87,41 @@
           chart (fn [callbacks] #(.onChart ^js/Object callbacks (clj->js %)))
           current #(.-current ^js/Object %)})
 
+(defn source-var? [ctx source]
+  (when (re-find #"^[a-zA-Z*+!-_?][0-9a-zA-Z*+!-_?]*$" source)
+    (sci/eval-string* ctx (str "(var? #'" source ")"))))
+
+(defn display [ctx source]
+  (let [meta (sci/eval-string* ctx (str "(meta #'" source ")"))
+        display-fn (or (:display-fn meta) identity)
+        value (sci/eval-string* ctx source)]
+    (display-fn value)))
+
 (defn ^:export evalString 
   [ctx 
    source 
    {:keys [onRenderHTML onRenderText onRenderCode onRenderReagent onSetInterval onChart] :as opts}]
-  (bind-api opts
-            (sci/eval-string*
-              (sci/merge-opts ctx
-                              {:namespaces {'user {'$ $
-                                                   '% %
-                                                   'def$ def$
-                                                   'def=$ def=$
-                                                   'def% def%
-                                                   'def=% def=%}
-                                            'w {'html w-html
-                                                'text w-text
-                                                'md w-md
-                                                'code w-code
-                                                'reagent w-reagent
-                                                'set-interval w-set-interval
-                                                'chart w-chart
-                                                'current w-current}}})
-              source)))
+  (js/console.log (source-var? ctx source))
+  (if (source-var? ctx source)
+    (display ctx source)
+    (bind-api opts
+              (sci/eval-string*
+                (sci/merge-opts ctx
+                                {:namespaces {'user {'$ $
+                                                     '% %
+                                                     'def$ def$
+                                                     'def=$ def=$
+                                                     'def% def%
+                                                     'def=% def=%}
+                                              'w {'html w-html
+                                                  'text w-text
+                                                  'md w-md
+                                                  'code w-code
+                                                  'reagent w-reagent
+                                                  'set-interval w-set-interval
+                                                  'chart w-chart
+                                                  'current w-current}}})
+                source))))
 
 (comment
   (def ctx (init nil))
