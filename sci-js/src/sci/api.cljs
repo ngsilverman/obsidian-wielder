@@ -91,10 +91,14 @@
   (when (re-find #"^[a-zA-Z*+!-_?][0-9a-zA-Z*+!-_?]*$" source)
     (sci/eval-string* ctx (str "(var? #'" source ")"))))
 
+(defn derefable? [obj]
+  (exists? (.-cljs$core$IDeref$_deref$arity$1 obj)))
+
 (defn display [ctx source]
   (let [meta (sci/eval-string* ctx (str "(meta #'" source ")"))
         display-fn (or (:display-fn meta) identity)
-        value (sci/eval-string* ctx source)]
+        value (sci/eval-string* ctx source)
+        value (if (derefable? value) @value value)]
     (display-fn value)))
 
 (defn ^:export evalString 
