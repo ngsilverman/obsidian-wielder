@@ -106,7 +106,7 @@ export default class ObsidianClojure extends Plugin {
       // TODO Look into context.addChild and whether we could get a callback when the file is closed, for example
       //   It might be a good spot to kill intervals
 
-      console.log(`${context.sourcePath}: Requesting evaluation from Markdown post-processor.`)
+      // console.log(`${context.sourcePath}: Requesting evaluation from Markdown post-processor.`)
 
       this.evaluator
         .evaluate(context.sourcePath, false)

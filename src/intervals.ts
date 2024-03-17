@@ -9,6 +9,7 @@ export class IntervalsManager {
   }
 
   public setInterval(handler: TimerHandler, intervalMs: number): number {
+    // TODO Could we use the view's setInterval method to have it be automatically managed for us?
     const intervalId = window.setInterval(handler, intervalMs)
     this.plugin.registerInterval(intervalId)
     this.activeIntervals.push(intervalId)

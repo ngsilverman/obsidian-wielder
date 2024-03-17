@@ -1,5 +1,5 @@
 {
-  "mySetting": "default",
-  "fullErrors": false,
-  "blockLanguage": "clojure"
+  "fullErrors": true,
+  "blockLanguage": "clojure",
+  "mySetting": "default"
 }

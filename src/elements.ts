@@ -30,7 +30,10 @@ export class ElementsManager {
 
   public renderCode(sectionElement: HTMLElement, evaluation: CodeBlockEvaluation) {
     // Expects only one code block at a time.
+    // console.log(sectionElement)
+    // console.log(sectionElement.innerHTML)
     const codeElement = sectionElement.querySelector('code')
+    // console.log(codeElement)
     const parentElement = codeElement.parentElement.parentElement;
 
     // Might have existing wrapper we need to remove first
@@ -61,6 +64,15 @@ export class ElementsManager {
 
     $resultsWrapper.appendChild($results)
     parentElement.appendChild($resultsWrapper)
+
+    const renderProp = evaluation.codeBlock.props?.render
+    if (renderProp === 'none') {
+      sectionElement.style.display = 'none'
+    } else if (renderProp === 'code') {
+      $resultsWrapper.style.display = 'none'
+    } else if (renderProp === 'results') {
+      codeElement.parentElement.style.display = 'none'
+    }
   }
 
   public renderInlineCode(sectionElement: HTMLElement, evaluation: CodeBlockEvaluation) {

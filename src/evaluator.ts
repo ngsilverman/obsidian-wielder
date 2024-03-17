@@ -36,20 +36,24 @@ function extractCodeBlocks(lang: string, markdown: string, inlineClojure: boolea
   const codeBlocks: CodeBlock[] = []
   let isInCodeBlock = false
   let currentBlock = ''
+  let blockProps = null
   let blockStartLine = 0
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const blockStartMatch = line.match(`^\`\`\`${lang}(\\s|$)(.+$)?`)
     if (line.match(`^\`\`\`${lang}(\\s|$)`)) {
       isInCodeBlock = true;
       blockStartLine = i;
       currentBlock = '';
+      blockProps = blockStartMatch[2] != null ? (0, eval)('({' + blockStartMatch[2] + '})') : null
     } else if (line.match(/^```(\s|$)/) && isInCodeBlock) {
       isInCodeBlock = false;
       codeBlocks.push({
         source: currentBlock.trim(),
         lineStart: blockStartLine,
         lineEnd: i,
+        props: blockProps,
         isInline: false
       });
     } else if (isInCodeBlock) {
@@ -140,12 +144,12 @@ export class ClojureEvaluator {
     return promise
   }
 
-  public evaluateSource(source: string, callbacks: EvalCallbacks) {
+  public evaluateSource(source: string, callbacks?: EvalCallbacks) {
     let output: string = ''
     let isError: boolean = false
 
     try {
-      output = sci.eval(this.sciContext, source, callbacks)
+      output = sci.eval(this.sciContext, source, callbacks || {})
     } catch (err) {
       console.error(err)
       console.trace()
@@ -189,22 +193,22 @@ export class ClojureEvaluator {
 
   private async maybeEvaluateFile(file: TFile, force: boolean): Promise<[DocumentEvaluation, cached: boolean]> {
     const path = file.path
-    console.log(`${path}: Evaluation request received.`)
+    // console.log(`${path}: Evaluation request received.`)
     const markdown = await file.vault.cachedRead(file)
     const hash = sha256(markdown)
 
     let evaluate = false
     const promise = this.documentEvaluations[file.path]
     if (promise == null) {
-      console.log(`${path}: No cached evaluation found.`)
+      // console.log(`${path}: No cached evaluation found.`)
       evaluate = true
     } else {
       const documentEvaluation = await promise
       if (documentEvaluation.hash === hash) {
-        if (force) console.log(`${path}: Cache is up to date, but evaluation is forced.`)
-        else console.log(`${path}: Cache is up to date.`)
+        // if (force) console.log(`${path}: Cache is up to date, but evaluation is forced.`)
+        // else console.log(`${path}: Cache is up to date.`)
       } else {
-        console.log(`${path}: Cache is outdated.`)
+        // console.log(`${path}: Cache is outdated.`)
       }
 
       evaluate = force || documentEvaluation.hash !== hash
@@ -214,7 +218,7 @@ export class ClojureEvaluator {
     }
 
     if (evaluate) {
-      console.log(`${path}: Queueing evaluation.`)
+      // console.log(`${path}: Queueing evaluation.`)
       this.documentEvaluations[path] = this.evaluateFile(file, hash, markdown)
     }
 
@@ -305,10 +309,15 @@ export class ClojureEvaluator {
   }
 }
 
+interface CodeBlockProps {
+  render?: 'code' | 'none' | 'results'
+}
+
 interface CodeBlock {
   source: string
   lineStart: number
   lineEnd: number
+  props?: CodeBlockProps
   isInline: boolean
 }
 
